@@ -1,23 +1,22 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useMemo, useCallback } from 'react'
 import { exportToExcel } from '../../utils/exportToExcel'
 import {
   Users, Plus, Search, X, Edit3, Trash2,
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
-  Phone, Mail, FileText, AlertTriangle,
+  Phone, Mail, FileText,
   CheckCircle, Calendar, User, Briefcase,
-  Eye, Check, ArrowUpDown, LayoutList, LayoutGrid, FileSpreadsheet,
+  Eye, Check, LayoutList, LayoutGrid, FileSpreadsheet,
 } from 'lucide-react'
+import { useLocalStorage } from '../../hooks/useLocalStorage'
+import { useToast } from '../../hooks/useToast'
+import { SortArrow } from '../../components/SortArrow'
+import { ToastBar } from '../../components/ToastBar'
+import { Pagination } from '../../components/Pagination'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import type { SortDir } from '../../hooks/useFilteredList'
 
 interface Personnel {
-  id: number
-  name: string
-  role: string
-  phone: string
-  email: string
-  startDate: string
-  notes: string
-  status: 'active' | 'passive'
-  createdAt: string
+  id: number; name: string; role: string; phone: string; email: string
+  startDate: string; notes: string; status: 'active' | 'passive'; createdAt: string
 }
 
 const ROLES = [
@@ -28,162 +27,127 @@ const ROLES = [
 ]
 
 const STORAGE_KEY = 'hantech_personnel'
-
-function loadPersonnel(): Personnel[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch { /* ignore */ }
-  return [
-    { id: 1, name: 'Dr. Ali Yılmaz', role: 'Doktor', phone: '0532 111 2233', email: 'ali.yilmaz@hantech.com', startDate: '2025-01-15', notes: 'Başhekim', status: 'active', createdAt: '2025-01-10' },
-    { id: 2, name: 'Ayşe Demir', role: 'Hemşire', phone: '0533 222 3344', email: 'ayse.demir@hantech.com', startDate: '2025-02-01', notes: '', status: 'active', createdAt: '2025-01-28' },
-    { id: 3, name: 'Mehmet Kaya', role: 'Radyoloji Teknikeri', phone: '0535 333 4455', email: 'mehmet.kaya@hantech.com', startDate: '2025-03-10', notes: 'PA akciğer grafisi çekimi', status: 'active', createdAt: '2025-03-05' },
-    { id: 4, name: 'Zeynep Çelik', role: 'Odyometrist', phone: '0536 444 5566', email: 'zeynep.celik@hantech.com', startDate: '2025-04-05', notes: 'Odyometri testleri', status: 'active', createdAt: '2025-03-28' },
-    { id: 5, name: 'Fatma Yıldız', role: 'Laborant', phone: '0537 555 6677', email: 'fatma.yildiz@hantech.com', startDate: '2025-05-12', notes: 'Kan tahlilleri', status: 'active', createdAt: '2025-05-01' },
-    { id: 6, name: 'Ahmet Şahin', role: 'Lab. Teknikeri', phone: '0538 666 7788', email: 'ahmet.sahin@hantech.com', startDate: '2025-06-01', notes: 'Tam idrar tahlili', status: 'passive', createdAt: '2025-05-20' },
-    { id: 7, name: 'Mustafa Öztürk', role: 'Müdür', phone: '0539 777 8899', email: 'mustafa.ozturk@hantech.com', startDate: '2024-09-01', notes: 'Genel müdür', status: 'active', createdAt: '2024-08-20' },
-    { id: 8, name: 'Elif Korkmaz', role: 'İş Güvenliği Uzmanı', phone: '0540 888 9900', email: 'elif.korkmaz@hantech.com', startDate: '2025-07-22', notes: 'A sınıfı iş güvenliği uzmanı', status: 'active', createdAt: '2025-07-10' },
-  ]
-}
-
 type SortField = 'name' | 'role' | 'startDate' | 'status'
-type SortDir = 'asc' | 'desc'
 
-type ToastType = 'success' | 'error'
+const DEFAULT_PERSONNEL: Personnel[] = [
+  { id: 1, name: 'Dr. Ali Yılmaz', role: 'Doktor', phone: '0532 111 2233', email: 'ali.yilmaz@hantech.com', startDate: '2025-01-15', notes: 'Başhekim', status: 'active', createdAt: '2025-01-10' },
+  { id: 2, name: 'Ayşe Demir', role: 'Hemşire', phone: '0533 222 3344', email: 'ayse.demir@hantech.com', startDate: '2025-02-01', notes: '', status: 'active', createdAt: '2025-01-28' },
+  { id: 3, name: 'Mehmet Kaya', role: 'Radyoloji Teknikeri', phone: '0535 333 4455', email: 'mehmet.kaya@hantech.com', startDate: '2025-03-10', notes: 'PA akciğer grafisi çekimi', status: 'active', createdAt: '2025-03-05' },
+  { id: 4, name: 'Zeynep Çelik', role: 'Odyometrist', phone: '0536 444 5566', email: 'zeynep.celik@hantech.com', startDate: '2025-04-05', notes: 'Odyometri testleri', status: 'active', createdAt: '2025-03-28' },
+  { id: 5, name: 'Fatma Yıldız', role: 'Laborant', phone: '0537 555 6677', email: 'fatma.yildiz@hantech.com', startDate: '2025-05-12', notes: 'Kan tahlilleri', status: 'active', createdAt: '2025-05-01' },
+  { id: 6, name: 'Ahmet Şahin', role: 'Lab. Teknikeri', phone: '0538 666 7788', email: 'ahmet.sahin@hantech.com', startDate: '2025-06-01', notes: 'Tam idrar tahlili', status: 'passive', createdAt: '2025-05-20' },
+  { id: 7, name: 'Mustafa Öztürk', role: 'Müdür', phone: '0539 777 8899', email: 'mustafa.ozturk@hantech.com', startDate: '2024-09-01', notes: 'Genel müdür', status: 'active', createdAt: '2024-08-20' },
+  { id: 8, name: 'Elif Korkmaz', role: 'İş Güvenliği Uzmanı', phone: '0540 888 9900', email: 'elif.korkmaz@hantech.com', startDate: '2025-07-22', notes: 'A sınıfı iş güvenliği uzmanı', status: 'active', createdAt: '2025-07-10' },
+]
 
 export default function PersonnelPage() {
-  const [personnel, setPersonnel] = useState<Personnel[]>(loadPersonnel)
+  const [personnel, setPersonnel] = useLocalStorage(STORAGE_KEY, DEFAULT_PERSONNEL)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'passive'>('all')
   const [filterRole, setFilterRole] = useState('')
   const [sortField, setSortField] = useState<SortField>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(5)
+  const [perPage, setPerPage] = useState(8)
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Personnel | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [detailPerson, setDetailPerson] = useState<Personnel | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
-  const [toast, setToast] = useState<{ type: ToastType; message: string } | null>(null)
+  const { toast, showToast } = useToast()
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const [formName, setFormName] = useState('')
-  const [formRole, setFormRole] = useState('')
-  const [formPhone, setFormPhone] = useState('')
-  const [formEmail, setFormEmail] = useState('')
-  const [formStartDate, setFormStartDate] = useState('')
-  const [formNotes, setFormNotes] = useState('')
-  const [formStatus, setFormStatus] = useState<'active' | 'passive'>('active')
+  const [form, setForm] = useState({
+    name: '', role: '', phone: '', email: '', startDate: '', notes: '',
+    status: 'active' as 'active' | 'passive',
+  })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(personnel))
-  }, [personnel])
+  const updateForm = useCallback((field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }, [])
 
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(null), 2500)
-    return () => clearTimeout(t)
-  }, [toast])
+  const uniqueRoles = useMemo(() => [...new Set(personnel.map((p) => p.role))].sort(), [personnel])
 
-  function showToast(type: ToastType, message: string) {
-    setToast({ type, message })
-  }
+  const filtered = useMemo(() => {
+    return personnel
+      .filter((p) => {
+        if (filterStatus !== 'all' && p.status !== filterStatus) return false
+        if (filterRole && p.role !== filterRole) return false
+        if (!search) return true
+        const q = search.toLowerCase()
+        return p.name.toLowerCase().includes(q) || p.role.toLowerCase().includes(q) || p.phone.includes(q) || p.email.toLowerCase().includes(q)
+      })
+      .sort((a, b) => {
+        const dir = sortDir === 'asc' ? 1 : -1
+        if (sortField === 'name') return a.name.localeCompare(b.name) * dir
+        if (sortField === 'role') return a.role.localeCompare(b.role) * dir
+        if (sortField === 'startDate') return a.startDate.localeCompare(b.startDate) * dir
+        return a.status.localeCompare(b.status) * dir
+      })
+  }, [personnel, search, filterStatus, filterRole, sortField, sortDir])
 
-  const filtered = personnel
-    .filter((p) => {
-      if (filterStatus !== 'all' && p.status !== filterStatus) return false
-      if (filterRole && p.role !== filterRole) return false
-      if (!search) return true
-      const q = search.toLowerCase()
-      return (
-        p.name.toLowerCase().includes(q) ||
-        p.role.toLowerCase().includes(q) ||
-        p.phone.includes(q) ||
-        p.email.toLowerCase().includes(q)
-      )
-    })
-    .sort((a, b) => {
-      const dir = sortDir === 'asc' ? 1 : -1
-      if (sortField === 'name') return a.name.localeCompare(b.name) * dir
-      if (sortField === 'role') return a.role.localeCompare(b.role) * dir
-      if (sortField === 'startDate') return a.startDate.localeCompare(b.startDate) * dir
-      return a.status.localeCompare(b.status) * dir
-    })
+  const totalFiltered = filtered.length
+  const paged = useMemo(() => filtered.slice((page - 1) * perPage, page * perPage), [filtered, page, perPage])
 
-  const totalPages = Math.ceil(filtered.length / perPage)
-  const paged = filtered.slice((page - 1) * perPage, page * perPage)
-
-  const uniqueRoles = [...new Set(personnel.map((p) => p.role))].sort()
-
-  function handleSort(field: SortField) {
+  const handleSort = useCallback((field: SortField) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortField(field); setSortDir('asc') }
-  }
+  }, [sortField])
 
-  function openAdd() {
+  const openAdd = useCallback(() => {
     setEditing(null)
-    setFormName(''); setFormRole(''); setFormPhone(''); setFormEmail('')
-    setFormStartDate(''); setFormNotes(''); setFormStatus('active'); setFormErrors({}); setShowModal(true)
-  }
+    setForm({ name: '', role: '', phone: '', email: '', startDate: '', notes: '', status: 'active' })
+    setFormErrors({})
+    setShowModal(true)
+  }, [])
 
-  function openEdit(p: Personnel) {
+  const openEdit = useCallback((p: Personnel) => {
     setEditing(p)
-    setFormName(p.name); setFormRole(p.role); setFormPhone(p.phone); setFormEmail(p.email)
-    setFormStartDate(p.startDate); setFormNotes(p.notes); setFormStatus(p.status); setFormErrors({}); setShowModal(true)
-  }
+    setForm({ name: p.name, role: p.role, phone: p.phone, email: p.email, startDate: p.startDate, notes: p.notes, status: p.status })
+    setFormErrors({})
+    setShowModal(true)
+  }, [])
 
-  function validateForm(): boolean {
+  const validateForm = useCallback(() => {
     const errors: Record<string, string> = {}
-    if (!formName.trim()) errors.name = 'Personel adı gerekli'
-    if (!formRole) errors.role = 'Görev seçin'
+    if (!form.name.trim()) errors.name = 'Personel adı gerekli'
+    if (!form.role) errors.role = 'Görev seçin'
     setFormErrors(errors)
     return Object.keys(errors).length === 0
-  }
+  }, [form])
 
-  function handleSave() {
+  const handleSave = useCallback(() => {
     if (!validateForm()) return
     if (editing) {
-      setPersonnel((prev) =>
-        prev.map((p) =>
-          p.id === editing.id
-            ? { ...p, name: formName, role: formRole, phone: formPhone, email: formEmail, startDate: formStartDate, notes: formNotes, status: formStatus }
-            : p
-        )
-      )
-      showToast('success', '"' + formName + '" güncellendi')
+      setPersonnel((prev) => prev.map((p) => p.id === editing.id ? { ...p, ...form } : p))
+      showToast('success', `"${form.name}" güncellendi`)
     } else {
       const newId = Math.max(...personnel.map((p) => p.id), 0) + 1
-      setPersonnel((prev) => [
-        ...prev,
-        { id: newId, name: formName, role: formRole, phone: formPhone, email: formEmail, startDate: formStartDate, notes: formNotes, status: formStatus, createdAt: new Date().toISOString().slice(0, 10) },
-      ])
-      showToast('success', '"' + formName + '" eklendi')
+      setPersonnel((prev) => [...prev, { id: newId, ...form, createdAt: new Date().toISOString().slice(0, 10) }])
+      showToast('success', `"${form.name}" eklendi`)
     }
     setShowModal(false)
-  }
+  }, [editing, form, validateForm, setPersonnel, personnel, showToast])
 
-  function handleDelete() {
+  const handleDelete = useCallback(() => {
     if (!deleteId) return
     const name = personnel.find((p) => p.id === deleteId)?.name
     setPersonnel((prev) => prev.filter((p) => p.id !== deleteId))
     setDeleteId(null)
-    if (name) showToast('success', '"' + name + '" silindi')
-  }
+    if (name) showToast('success', `"${name}" silindi`)
+  }, [deleteId, personnel, setPersonnel, showToast])
 
-  function toggleStatus(id: number) {
-    setPersonnel((prev) =>
-      prev.map((p) => {
-        if (p.id !== id) return p
-        const newStatus = p.status === 'active' ? 'passive' : 'active'
-        showToast('success', '"' + p.name + '" ' + (newStatus === 'active' ? 'aktifleştirildi' : 'pasifleştirildi'))
-        return { ...p, status: newStatus as 'active' | 'passive' }
-      })
-    )
-  }
+  const toggleStatus = useCallback((id: number) => {
+    setPersonnel((prev) => prev.map((p) => {
+      if (p.id !== id) return p
+      const newStatus = p.status === 'active' ? 'passive' : 'active'
+      showToast('success', `"${p.name}" ${newStatus === 'active' ? 'aktifleştirildi' : 'pasifleştirildi'}`)
+      return { ...p, status: newStatus }
+    }))
+  }, [setPersonnel, showToast])
 
-  function exportExcel() {
+  const exportExcel = useCallback(() => {
     exportToExcel(
       personnel as unknown as Record<string, unknown>[],
       [
@@ -198,9 +162,9 @@ export default function PersonnelPage() {
       'personeller',
     )
     showToast('success', 'Excel dışa aktarıldı')
-  }
+  }, [personnel, showToast])
 
-  function getRoleColor(role: string): string {
+  const getRoleColor = useCallback((role: string): string => {
     const colors: Record<string, string> = {
       'Müdür': '#8b5cf6', 'Yönetici': '#6366f1', 'Doktor': '#3b82f6',
       'Hemşire': '#ec4899', 'Radyoloji Teknikeri': '#06b6d4',
@@ -210,23 +174,14 @@ export default function PersonnelPage() {
       'Diyetisyen': '#f97316', 'Sekreter': '#64748b',
     }
     return colors[role] || '#64748b'
-  }
+  }, [])
 
-  function SortArrow({ field }: { field: SortField }) {
-    if (sortField !== field) return <ArrowUpDown size={12} strokeWidth={1.6} className="sort-arrow-idle" />
-    return sortDir === 'asc'
-      ? <ChevronUp size={13} strokeWidth={2} className="sort-arrow" />
-      : <ChevronDown size={13} strokeWidth={2} className="sort-arrow" />
-  }
+  const handlePageChange = useCallback((p: number) => setPage(p), [])
+  const handlePerPageChange = useCallback((n: number) => { setPerPage(n); setPage(1) }, [])
 
   return (
     <div className="page-content">
-      {toast && (
-        <div className={`toast toast-${toast.type}`}>
-          {toast.type === 'success' ? <CheckCircle size={16} strokeWidth={2} /> : <AlertTriangle size={16} strokeWidth={2} />}
-          {toast.message}
-        </div>
-      )}
+      <ToastBar toast={toast} />
 
       <div className="content-top">
         <div>
@@ -278,18 +233,10 @@ export default function PersonnelPage() {
             ))}
           </div>
           <div className="view-toggle">
-            <button
-              className={`view-toggle-btn ${viewMode === 'table' ? 'active' : ''}`}
-              onClick={() => setViewMode('table')}
-              title="Tablo görünümü"
-            >
+            <button className={`view-toggle-btn ${viewMode === 'table' ? 'active' : ''}`} onClick={() => setViewMode('table')} title="Tablo görünümü">
               <LayoutList size={15} strokeWidth={1.6} />
             </button>
-            <button
-              className={`view-toggle-btn ${viewMode === 'cards' ? 'active' : ''}`}
-              onClick={() => setViewMode('cards')}
-              title="Kart görünümü"
-            >
+            <button className={`view-toggle-btn ${viewMode === 'cards' ? 'active' : ''}`} onClick={() => setViewMode('cards')} title="Kart görünümü">
               <LayoutGrid size={15} strokeWidth={1.6} />
             </button>
           </div>
@@ -302,17 +249,17 @@ export default function PersonnelPage() {
             <thead>
               <tr>
                 <th onClick={() => handleSort('name')} className="sortable" style={{ minWidth: 200 }}>
-                  Ad Soyad <SortArrow field="name" />
+                  Ad Soyad <SortArrow field="name" sortField={sortField} sortDir={sortDir} />
                 </th>
                 <th onClick={() => handleSort('role')} className="sortable">
-                  Görev <SortArrow field="role" />
+                  Görev <SortArrow field="role" sortField={sortField} sortDir={sortDir} />
                 </th>
                 <th>İletişim</th>
                 <th onClick={() => handleSort('startDate')} className="sortable">
-                  Başlama <SortArrow field="startDate" />
+                  Başlama <SortArrow field="startDate" sortField={sortField} sortDir={sortDir} />
                 </th>
                 <th onClick={() => handleSort('status')} className="sortable">
-                  Durum <SortArrow field="status" />
+                  Durum <SortArrow field="status" sortField={sortField} sortDir={sortDir} />
                 </th>
                 <th style={{ width: 90 }}>İşlemler</th>
               </tr>
@@ -335,9 +282,7 @@ export default function PersonnelPage() {
                     <td>
                       <div className="company-name-cell" onClick={() => setDetailPerson(p)} style={{ cursor: 'pointer' }}>
                         <div className="company-avatar-sm">{p.name.charAt(0)}</div>
-                        <div>
-                          <strong>{p.name}</strong>
-                        </div>
+                        <div><strong>{p.name}</strong></div>
                       </div>
                     </td>
                     <td>
@@ -354,25 +299,15 @@ export default function PersonnelPage() {
                     </td>
                     <td><span className="cell-date">{p.startDate ? <><Calendar size={12} strokeWidth={1.6} /> {p.startDate}</> : '—'}</span></td>
                     <td>
-                      <button
-                        className={`status-badge ${p.status}`}
-                        onClick={() => toggleStatus(p.id)}
-                        title="Durumu değiştir"
-                      >
+                      <button className={`status-badge ${p.status}`} onClick={() => toggleStatus(p.id)} title="Durumu değiştir">
                         {p.status === 'active' ? 'Aktif' : 'Pasif'}
                       </button>
                     </td>
                     <td>
                       <div className="cell-actions">
-                        <button className="cell-action-btn view" onClick={() => setDetailPerson(p)} title="Detay">
-                          <Eye size={15} strokeWidth={1.6} />
-                        </button>
-                        <button className="cell-action-btn edit" onClick={() => openEdit(p)} title="Düzenle">
-                          <Edit3 size={15} strokeWidth={1.6} />
-                        </button>
-                        <button className="cell-action-btn delete" onClick={() => setDeleteId(p.id)} title="Sil">
-                          <Trash2 size={15} strokeWidth={1.6} />
-                        </button>
+                        <button className="cell-action-btn view" onClick={() => setDetailPerson(p)} title="Detay"><Eye size={15} strokeWidth={1.6} /></button>
+                        <button className="cell-action-btn edit" onClick={() => openEdit(p)} title="Düzenle"><Edit3 size={15} strokeWidth={1.6} /></button>
+                        <button className="cell-action-btn delete" onClick={() => setDeleteId(p.id)} title="Sil"><Trash2 size={15} strokeWidth={1.6} /></button>
                       </div>
                     </td>
                   </tr>
@@ -399,11 +334,7 @@ export default function PersonnelPage() {
                   <div className="company-card-avatar" style={{ background: getRoleColor(p.role) + '20', color: getRoleColor(p.role) }}>
                     {p.name.charAt(0)}
                   </div>
-                  <button
-                    className={`status-badge ${p.status}`}
-                    onClick={() => toggleStatus(p.id)}
-                    title="Durumu değiştir"
-                  >
+                  <button className={`status-badge ${p.status}`} onClick={() => toggleStatus(p.id)} title="Durumu değiştir">
                     {p.status === 'active' ? 'Aktif' : 'Pasif'}
                   </button>
                 </div>
@@ -422,12 +353,8 @@ export default function PersonnelPage() {
                     {p.startDate && <span><Calendar size={12} strokeWidth={1.6} /> {p.startDate}</span>}
                   </div>
                   <div className="cell-actions">
-                    <button className="cell-action-btn edit" onClick={() => openEdit(p)} title="Düzenle">
-                      <Edit3 size={15} strokeWidth={1.6} />
-                    </button>
-                    <button className="cell-action-btn delete" onClick={() => setDeleteId(p.id)} title="Sil">
-                      <Trash2 size={15} strokeWidth={1.6} />
-                    </button>
+                    <button className="cell-action-btn edit" onClick={() => openEdit(p)} title="Düzenle"><Edit3 size={15} strokeWidth={1.6} /></button>
+                    <button className="cell-action-btn delete" onClick={() => setDeleteId(p.id)} title="Sil"><Trash2 size={15} strokeWidth={1.6} /></button>
                   </div>
                 </div>
               </div>
@@ -436,41 +363,13 @@ export default function PersonnelPage() {
         </div>
       )}
 
-      <div className="pagination">
-        <div className="pagination-left">
-          <span className="pagination-info">Toplam {filtered.length} kayıt</span>
-          <select className="per-page-select" value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1) }}>
-            <option value={5}>5 / sayfa</option>
-            <option value={10}>10 / sayfa</option>
-            <option value={20}>20 / sayfa</option>
-            <option value={50}>50 / sayfa</option>
-          </select>
-        </div>
-        {totalPages > 1 && (
-          <div className="pagination-btns">
-            <button className="pagination-btn" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              <ChevronLeft size={15} strokeWidth={1.6} />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <button key={p} className={`pagination-btn ${p === page ? 'active' : ''}`} onClick={() => setPage(p)}>
-                {p}
-              </button>
-            ))}
-            <button className="pagination-btn" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
-              <ChevronRight size={15} strokeWidth={1.6} />
-            </button>
-          </div>
-        )}
-      </div>
+      <Pagination total={totalFiltered} page={page} perPage={perPage} onPageChange={handlePageChange} onPerPageChange={handlePerPageChange} />
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>
-                <span className="header-icon"><Users size={14} strokeWidth={2} /></span>
-                {editing ? 'Personel Düzenle' : 'Yeni Personel Ekle'}
-              </h3>
+              <h3><span className="header-icon"><Users size={14} strokeWidth={2} /></span>{editing ? 'Personel Düzenle' : 'Yeni Personel Ekle'}</h3>
               <button className="modal-close" onClick={() => setShowModal(false)}><X size={16} strokeWidth={2} /></button>
             </div>
             <div className="modal-body">
@@ -482,7 +381,7 @@ export default function PersonnelPage() {
                       <label>Ad Soyad <span className="required">*</span></label>
                       <div className={`input-wrap ${formErrors.name ? 'has-error' : ''}`}>
                         <User size={12} className="input-icon" strokeWidth={1.6} />
-                        <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Ad Soyad" autoFocus />
+                        <input type="text" value={form.name} onChange={(e) => updateForm('name', e.target.value)} placeholder="Ad Soyad" autoFocus />
                       </div>
                       {formErrors.name && <span className="field-error">{formErrors.name}</span>}
                     </div>
@@ -490,7 +389,7 @@ export default function PersonnelPage() {
                       <label>Görev <span className="required">*</span></label>
                       <div className={`input-wrap ${formErrors.role ? 'has-error' : ''}`}>
                         <Briefcase size={12} className="input-icon" strokeWidth={1.6} />
-                        <select value={formRole} onChange={(e) => setFormRole(e.target.value)}>
+                        <select value={form.role} onChange={(e) => updateForm('role', e.target.value)}>
                           <option value="">Seçiniz</option>
                           {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                         </select>
@@ -501,28 +400,28 @@ export default function PersonnelPage() {
                       <label>Telefon</label>
                       <div className="input-wrap">
                         <Phone size={12} className="input-icon" strokeWidth={1.6} />
-                        <input type="text" value={formPhone} onChange={(e) => setFormPhone(e.target.value)} placeholder="0xxx xxx xx xx" />
+                        <input type="text" value={form.phone} onChange={(e) => updateForm('phone', e.target.value)} placeholder="0xxx xxx xx xx" />
                       </div>
                     </div>
                     <div className="field-group">
                       <label>E-posta</label>
                       <div className="input-wrap">
                         <Mail size={12} className="input-icon" strokeWidth={1.6} />
-                        <input type="email" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} placeholder="ornek@hantech.com" />
+                        <input type="email" value={form.email} onChange={(e) => updateForm('email', e.target.value)} placeholder="ornek@hantech.com" />
                       </div>
                     </div>
                     <div className="field-group">
                       <label>İşe Başlama Tarihi</label>
                       <div className="input-wrap">
                         <Calendar size={12} className="input-icon" strokeWidth={1.6} />
-                        <input type="date" value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)} />
+                        <input type="date" value={form.startDate} onChange={(e) => updateForm('startDate', e.target.value)} />
                       </div>
                     </div>
                     <div className="field-group">
                       <label>Durum</label>
                       <div className="input-wrap">
                         <CheckCircle size={12} className="input-icon" strokeWidth={1.6} />
-                        <select value={formStatus} onChange={(e) => setFormStatus(e.target.value as 'active' | 'passive')}>
+                        <select value={form.status} onChange={(e) => updateForm('status', e.target.value)}>
                           <option value="active">Aktif</option>
                           <option value="passive">Pasif</option>
                         </select>
@@ -532,7 +431,7 @@ export default function PersonnelPage() {
                       <label>Notlar</label>
                       <div className="input-wrap textarea-wrap">
                         <FileText size={12} className="input-icon" strokeWidth={1.6} />
-                        <textarea value={formNotes} onChange={(e) => setFormNotes(e.target.value)} placeholder="Personel hakkında notlar" rows={2} />
+                        <textarea value={form.notes} onChange={(e) => updateForm('notes', e.target.value)} placeholder="Personel hakkında notlar" rows={2} />
                       </div>
                     </div>
                   </div>
@@ -549,27 +448,13 @@ export default function PersonnelPage() {
         </div>
       )}
 
-      {deleteId && (
-        <div className="modal-overlay" onClick={() => setDeleteId(null)}>
-          <div className="modal modal-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3><AlertTriangle size={18} strokeWidth={1.6} style={{ color: '#ef4444', marginRight: 8 }} /> Personeli Sil</h3>
-            </div>
-            <div className="modal-body">
-              <p>
-                <strong>{personnel.find((p) => p.id === deleteId)?.name}</strong> personelini silmek istediğinize emin misiniz?
-              </p>
-              <p style={{ marginTop: 8, fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                Bu işlem geri alınamaz.
-              </p>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-ghost" onClick={() => setDeleteId(null)}>İptal</button>
-              <button className="btn btn-danger" onClick={handleDelete}>Evet, Sil</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="Personeli Sil"
+        itemName={personnel.find((p) => p.id === deleteId)?.name || ''}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+      />
 
       {detailPerson && (
         <div className="modal-overlay" onClick={() => setDetailPerson(null)}>

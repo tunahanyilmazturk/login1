@@ -10,6 +10,8 @@ import TestsPage from './features/tests/TestsPage'
 import EquipmentPage from './features/equipment/EquipmentPage'
 import VehiclesPage from './features/vehicles/VehiclesPage'
 import QuotesPage from './features/quotes/QuotesPage'
+import QuoteWizard from './features/quotes/QuoteWizard'
+import QuoteDetailPage from './features/quotes/QuoteDetailPage'
 import ScansPage from './features/scans/ScansPage'
 import './app/App.css'
 
@@ -25,6 +27,8 @@ function AppShell({ onLogout }: { onLogout: () => void }) {
           <Route path="/equipment" element={<EquipmentPage />} />
           <Route path="/vehicles" element={<VehiclesPage />} />
           <Route path="/quotes" element={<QuotesPage />} />
+          <Route path="/quotes/new" element={<QuoteWizard />} />
+          <Route path="/quotes/:id" element={<QuoteDetailPage />} />
           <Route path="/scans" element={<ScansPage />} />
           <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>

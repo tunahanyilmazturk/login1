@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   LayoutDashboard, Building2, Users, FlaskConical, Monitor, Truck, FileText, Stethoscope, ChevronDown, LogOut,
   Moon, Sun,
@@ -23,8 +23,8 @@ const menuSections: { heading: string; items: MenuItem[] }[] = [
       { id: 'tests', label: 'Testler', icon: FlaskConical },
       { id: 'equipment', label: 'Ekipmanlar', icon: Monitor },
       { id: 'vehicles', label: 'Mobil Araçlar', icon: Truck },
-      { id: 'quotes', label: 'Teklifler', icon: FileText },
-      { id: 'scans', label: 'Taramalar', icon: Stethoscope },
+      { id: 'quotes', label: 'Teklifler', icon: FileText, badge: '6' },
+      { id: 'scans', label: 'Taramalar', icon: Stethoscope, badge: '6' },
     ],
   },
 ]
@@ -34,12 +34,7 @@ function isItemActive(item: MenuItem, activeId: string): boolean {
 }
 
 export default function Sidebar({
-  active,
-  onSelect,
-  collapsed,
-  theme,
-  toggleTheme,
-  onLogout,
+  active, onSelect, collapsed, theme, toggleTheme, onLogout,
 }: {
   active: string
   onSelect: (id: string) => void
@@ -51,28 +46,28 @@ export default function Sidebar({
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
-  function toggleSub(id: string) {
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }))
-  }
-
-  function handleSelect(id: string) {
+  const handleSelect = useCallback((id: string) => {
     onSelect(id)
-  }
+  }, [onSelect])
 
-  function handleItemClick(item: MenuItem) {
+  const handleItemClick = useCallback((item: MenuItem) => {
     if (item.sub) {
-      toggleSub(item.id)
-      if (!expanded[item.id]) {
-        handleSelect(item.sub[0].id)
-      }
+      setExpanded((prev) => {
+        const isOpen = !prev[item.id]
+        if (isOpen) onSelect(item.sub![0].id)
+        return { ...prev, [item.id]: isOpen }
+      })
     } else {
-      handleSelect(item.id)
+      onSelect(item.id)
     }
-  }
+  }, [onSelect])
+
+  const setHovered = useCallback((id: string | null) => {
+    setHoveredItem(id)
+  }, [])
 
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
-      {/* Header */}
       <div className="sidebar-header">
         <div className="sidebar-logo-wrap">
           {collapsed ? (
@@ -89,7 +84,6 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="sidebar-nav">
         {menuSections.map((section) => (
           <div key={section.heading} className="sidebar-section">
@@ -107,8 +101,8 @@ export default function Sidebar({
                   <button
                     className={`sidebar-item ${isActive ? 'active' : ''}`}
                     onClick={() => handleItemClick(item)}
-                    onMouseEnter={() => setHoveredItem(item.id)}
-                    onMouseLeave={() => setHoveredItem(null)}
+                    onMouseEnter={() => setHovered(item.id)}
+                    onMouseLeave={() => setHovered(null)}
                     title={collapsed ? item.label : undefined}
                   >
                     {isActive && <span className="sidebar-active-indicator" />}
@@ -126,7 +120,6 @@ export default function Sidebar({
                     {collapsed && item.sub && <span className="sidebar-sub-dot" />}
                   </button>
 
-                  {/* Tooltip for collapsed mode */}
                   {collapsed && isHovered && (
                     <div className="sidebar-tooltip">
                       <strong>{item.label}</strong>
@@ -142,7 +135,6 @@ export default function Sidebar({
                     </div>
                   )}
 
-                  {/* Sub-menu for expanded mode */}
                   {!collapsed && item.sub && (
                     <div className={`sidebar-sub-wrap ${isOpen ? 'open' : ''}`}>
                       <div className="sidebar-sub">
@@ -166,7 +158,6 @@ export default function Sidebar({
         ))}
       </nav>
 
-      {/* Footer */}
       <div className="sidebar-footer">
         <div className={`sidebar-user-card ${collapsed ? 'collapsed' : ''}`}>
           <div className="sidebar-user-avatar-wrap">
@@ -190,7 +181,6 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Version badge in collapsed mode */}
       {collapsed && (
         <div className="sidebar-version-badge">v2.0</div>
       )}

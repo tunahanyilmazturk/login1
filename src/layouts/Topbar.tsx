@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Bell, Search, Sun, Moon, ChevronDown, PanelLeftClose, PanelLeft, X,
   Maximize2, Minimize2, User, Settings, LogOut, HelpCircle,
@@ -34,13 +34,19 @@ const notificationColors = {
   info: '#3b82f6',
 }
 
+const pageLabels: Record<string, string> = {
+  dashboard: 'Genel Bakış',
+  companies: 'Firmalar',
+  personnel: 'Personeller',
+  tests: 'Testler',
+  equipment: 'Ekipmanlar',
+  vehicles: 'Mobil Araçlar',
+  quotes: 'Teklifler',
+  scans: 'Taramalar',
+}
+
 export default function Topbar({
-  theme,
-  toggleTheme,
-  collapsed,
-  onToggleCollapse,
-  onLogout,
-  active,
+  theme, toggleTheme, collapsed, onToggleCollapse, onLogout, active,
 }: {
   theme: 'light' | 'dark'
   toggleTheme: () => void
@@ -58,7 +64,7 @@ export default function Topbar({
   const userRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const unreadCount = notifications.filter((n) => !n.read).length
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -84,16 +90,6 @@ export default function Topbar({
     return () => document.removeEventListener('keydown', handleKey)
   }, [])
 
-  function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen()
-      setIsFullscreen(true)
-    } else {
-      document.exitFullscreen()
-      setIsFullscreen(false)
-    }
-  }
-
   useEffect(() => {
     function handleFSChange() {
       setIsFullscreen(!!document.fullscreenElement)
@@ -101,6 +97,23 @@ export default function Topbar({
     document.addEventListener('fullscreenchange', handleFSChange)
     return () => document.removeEventListener('fullscreenchange', handleFSChange)
   }, [])
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen()
+      setIsFullscreen(true)
+    } else {
+      document.exitFullscreen()
+      setIsFullscreen(false)
+    }
+  }, [])
+
+  const clearSearch = useCallback(() => {
+    setSearchValue('')
+    searchRef.current?.focus()
+  }, [])
+
+  const activeLabel = active ? pageLabels[active] || '' : ''
 
   return (
     <header className="topbar">
@@ -112,9 +125,7 @@ export default function Topbar({
         <nav className="topbar-breadcrumb">
           <span className="breadcrumb-item">OSGB</span>
           <span className="breadcrumb-sep">/</span>
-          <span className="breadcrumb-item active">
-            {active === 'dashboard' ? 'Genel Bakış' : active === 'companies' ? 'Firmalar' : ''}
-          </span>
+          <span className="breadcrumb-item active">{activeLabel}</span>
         </nav>
       </div>
 
@@ -131,7 +142,7 @@ export default function Topbar({
             onBlur={() => { if (!searchValue) setSearchOpen(false) }}
           />
           {searchValue && (
-            <button className="topbar-search-clear" onClick={() => { setSearchValue(''); searchRef.current?.focus() }}>
+            <button className="topbar-search-clear" onClick={clearSearch}>
               <X size={14} strokeWidth={1.6} />
             </button>
           )}

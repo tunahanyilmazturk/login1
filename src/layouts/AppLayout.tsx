@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useCallback, useMemo, type ReactNode } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
@@ -11,14 +11,14 @@ export default function AppLayout({ onLogout, children }: { onLogout: () => void
   const navigate = useNavigate()
   const location = useLocation()
 
-  const active = location.pathname.replace('/', '') || 'dashboard'
+  const active = useMemo(() => (location.pathname.replace('/', '') || 'dashboard').split('/')[0], [location.pathname])
 
-  function handleNavigate(id: string) {
+  const handleNavigate = useCallback((id: string) => {
     navigate(`/${id}`)
-    handleCloseMobile()
-  }
+    setMobileOpen(false)
+  }, [navigate])
 
-  function handleToggleMenu() {
+  const handleToggleMenu = useCallback(() => {
     if (window.innerWidth <= 768) {
       setMobileOpen((v) => !v)
     } else {
@@ -28,11 +28,9 @@ export default function AppLayout({ onLogout, children }: { onLogout: () => void
         return next
       })
     }
-  }
+  }, [])
 
-  function handleCloseMobile() {
-    setMobileOpen(false)
-  }
+  const handleCloseMobile = useCallback(() => setMobileOpen(false), [])
 
   return (
     <div className={`app-layout ${collapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'sidebar-open' : ''}`}>
