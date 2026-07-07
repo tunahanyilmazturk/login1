@@ -1,13 +1,15 @@
-import { TrendingUp, UserPlus, FileEdit, ClipboardCheck, FileText } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { TrendingUp, Plus, FileText, FileSpreadsheet } from 'lucide-react'
 
 const quickActions = [
-  { label: 'Personel Ekle', icon: UserPlus, color: '#3b82f6' },
-  { label: 'Eğitim Aç', icon: FileEdit, color: '#8b5cf6' },
-  { label: 'Denetim Başlat', icon: ClipboardCheck, color: '#f59e0b' },
-  { label: 'Rapor Oluştur', icon: FileText, color: '#10b981' },
+  { label: 'Firma Ekle', icon: Plus, color: '#3b82f6', action: 'companies' },
+  { label: 'Firmalar', icon: FileText, color: '#8b5cf6', action: 'companies' },
+  { label: 'Excel Aktar', icon: FileSpreadsheet, color: '#22c55e', action: 'companies' },
 ]
 
 export default function QuickActions() {
+  const navigate = useNavigate()
+
   return (
     <section className="card quick-card">
       <div className="card-title-row">
@@ -17,9 +19,13 @@ export default function QuickActions() {
         {quickActions.map((action) => {
           const Icon = action.icon
           return (
-            <button key={action.label} className="quick-item">
+            <button
+              key={action.label}
+              className="quick-item"
+              onClick={() => navigate(`/${action.action}`)}
+            >
               <span className="quick-icon" style={{ background: `${action.color}14`, color: action.color }}>
-                <Icon size={18} strokeWidth={1.8} />
+                <Icon size={17} strokeWidth={1.8} />
               </span>
               <span>{action.label}</span>
             </button>

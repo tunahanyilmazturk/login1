@@ -1,32 +1,49 @@
-# React + TypeScript + Vite
+# HanTech OSGB
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Modern OSGB (Ortak Sağlık Güvenlik Birimi) yönetim sistemi. Saha operasyonları, eğitim takibi ve denetim raporlamayı kurumsal güvenlikle buluşturan platform.
 
-Currently, two official plugins are available:
+## Özellikler
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Saha Operasyon Yönetimi** — Personel kaydı, görev atama ve takip
+- **Dijital Eğitim Takibi** — Aktif/planlı eğitimler, sertifika yönetimi
+- **Denetim Raporlama** — Sahada denetim, bulgu tespiti ve raporlama
+- **Dashboard** — Anlık istatistikler, aktivite akışı ve hızlı işlemler
+- **Karanlık/Aydınlık Tema** — Kullanıcı tercihine göre tema desteği
+- **Duyarlı Tasarım** — Mobil, tablet ve masaüstü için uyumlu arayüz
 
-## React Compiler
+## Kullanılan Teknolojiler
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- [React 19](https://react.dev/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Vite](https://vitejs.dev/)
+- [Lucide React](https://lucide.dev/) — İkon kütüphanesi
 
-## Expanding the Oxlint configuration
+## Geliştirme
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+```bash
+# Bağımlılıkları yükle
+npm install
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+# Geliştirme sunucusunu başlat
+npm run dev
+
+# Production build
+npm run build
+
+# Lint
+npm run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Proje Yapısı
+
+```
+src/
+├── components/       # Bileşenler
+│   └── dashboard/    # Dashboard bileşenleri
+├── layouts/          # Sayfa düzenleri (Sidebar, Topbar, AppLayout)
+├── pages/            # Sayfalar
+├── App.tsx           # Ana uygulama (giriş ve dashboard shell)
+├── App.css           # Ana stiller
+├── ThemeContext.tsx   # Tema yönetimi
+└── main.tsx          # Giriş noktası
+```
